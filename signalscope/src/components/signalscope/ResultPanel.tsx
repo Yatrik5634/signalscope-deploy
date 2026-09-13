@@ -213,16 +213,14 @@ export function ResultPanel({ result, imageUrl, imageName, onReset }: Props) {
                 <div className="space-y-3">
                   <div className="rounded-lg bg-frost p-4">
                     <div className="font-mono text-[11px] text-muted-foreground mb-3">EXIF DATA</div>
-                    <table className="w-full text-sm">
-                      <tbody>
-                        {Object.entries(result.metadata.exif_summary).map(([key, val]) => (
-                          <tr key={key} className="border-b border-border/20 last:border-0">
-                            <td className="py-1.5 pr-3 font-medium text-muted-foreground">{key}</td>
-                            <td className="py-1.5 font-mono text-xs">{val}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div className="flex flex-col gap-2 mt-2 text-sm">
+                      {Object.entries(result.metadata.exif_summary).map(([key, val]) => (
+                        <div key={key} className="flex flex-col border-b border-border/20 pb-2 last:border-0 last:pb-0 sm:flex-row sm:justify-between sm:gap-4">
+                          <span className="font-medium text-muted-foreground shrink-0">{key}</span>
+                          <span className="font-mono text-[11px] text-foreground/80 sm:text-right break-words">{val as string}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                   <div className="rounded-lg bg-frost p-4">
                     <div className="font-mono text-[11px] text-muted-foreground mb-2">C2PA / CONTENT CREDENTIALS</div>
