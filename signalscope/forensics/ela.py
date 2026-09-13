@@ -4,13 +4,13 @@ import base64
 from PIL import Image, ImageChops, ImageEnhance
 import io
 
-def generate_ela_heatmap_base64(image_path: str, quality: int = 90) -> str:
+def generate_ela_heatmap_base64(image_path: str, quality: int = 90) -> tuple[str, float]:
     """
     Performs Error Level Analysis (ELA) on the image.
     ELA highlights areas that have been modified or have different compression levels,
     which is highly effective at pointing out AI-generated or spliced regions.
     
-    Returns a Base64 encoded string of the heatmap image.
+    Returns a tuple: (Base64 encoded string of the heatmap image, percentage of manipulated pixels).
     """
     try:
         # 1. Open original image
@@ -44,6 +44,11 @@ def generate_ela_heatmap_base64(image_path: str, quality: int = 90) -> str:
         # Convert to grayscale first, then apply color map
         gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
         
+        # Calculate percentage of abnormal pixels (intensity > 50 out of 255)
+        abnormal_pixels = np.sum(gray > 50)
+        total_pixels = gray.size
+        percentage = round((abnormal_pixels / total_pixels) * 100, 2)
+        
         # Apply JET colormap (Blue=Low manipulation, Red=High manipulation)
         heatmap = cv2.applyColorMap(gray, cv2.COLORMAP_JET)
         
@@ -54,8 +59,8 @@ def generate_ela_heatmap_base64(image_path: str, quality: int = 90) -> str:
         base64_str = base64.b64encode(buffer).decode('utf-8')
         
         # Add the data URI prefix for web
-        return f"data:image/jpeg;base64,{base64_str}"
+        return (f"data:image/jpeg;base64,{base64_str}", percentage)
         
     except Exception as e:
         print(f"Error generating ELA heatmap: {e}")
-        return ""
+        return ("", 0.0)
