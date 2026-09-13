@@ -1,0 +1,175 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * SignalScope design system — "Frost Evidence Rig".
+ * Frosted glass panels on a cool slate light-table background,
+ * Anton display type, Inter body, JetBrains Mono for instrument labels.
+ * All colors are oklch tokens. Never hardcode colors in components.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Anton", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted-surface);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-frost: var(--frost);
+  --color-frost-foreground: var(--foreground);
+  --color-verdict-ai: var(--verdict-ai);
+  --color-verdict-ai-soft: var(--verdict-ai-soft);
+  --color-verdict-real: var(--verdict-real);
+  --color-verdict-real-soft: var(--verdict-real-soft);
+  --color-signal-med: var(--signal-med);
+  --color-signal-low: var(--signal-low);
+  --color-placeholder: var(--placeholder);
+
+  --shadow-panel: 0 40px 80px -40px oklch(0.218 0.033 251.3 / 0.45);
+  --shadow-plate: 0 30px 60px -30px oklch(0.218 0.033 251.3 / 0.4);
+  --shadow-cta: 0 12px 28px -14px oklch(0.581 0.229 263.9 / 0.8);
+}
+
+:root {
+  --radius: 0.75rem;
+
+  --background: oklch(0.949 0.009 242.8);
+  --foreground: oklch(0.218 0.033 251.3);
+  --muted-foreground: oklch(0.455 0.028 250.4);
+  --muted-surface: oklch(0.901 0.018 245.4);
+  --frost: oklch(1 0 0);
+  --primary: oklch(0.581 0.229 263.9);
+  --primary-foreground: oklch(1 0 0);
+  --primary-dark: oklch(0.512 0.216 263.6);
+  --primary-soft: oklch(0.942 0.027 265.5);
+  --verdict-ai: oklch(0.626 0.193 23);
+  --verdict-ai-soft: oklch(0.952 0.021 17.5);
+  --verdict-real: oklch(0.618 0.13 160.7);
+  --verdict-real-soft: oklch(0.953 0.02 164.6);
+  --signal-med: oklch(0.784 0.137 70.2);
+  --signal-low: oklch(0.871 0.064 259.4);
+  --placeholder: oklch(0.88 0.016 245.1);
+  --panel-tint: oklch(0.901 0.018 245.4);
+
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --secondary: oklch(0.96 0.008 245);
+  --secondary-foreground: var(--foreground);
+  --accent: oklch(0.942 0.027 265.5);
+  --accent-foreground: var(--foreground);
+  --destructive: oklch(0.626 0.193 23);
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.877 0.018 245.4);
+  --input: oklch(0.877 0.018 245.4);
+  --ring: oklch(0.581 0.229 263.9);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(120% 90% at 15% -10%, oklch(1 0 0) 0%, oklch(1 0 0 / 0) 45%),
+      radial-gradient(120% 80% at 100% 120%, var(--panel-tint) 0%, oklch(0.901 0.018 245.4 / 0) 55%);
+    background-attachment: fixed;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(720%);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@utility rise-in {
+  animation: rise-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+@utility pulse-soft {
+  animation: pulse-soft 1.8s ease-in-out infinite;
+}
+
+@utility sweep-bar {
+  animation: sweep 2.2s linear infinite;
+}
+
+/* Frosted panel — the primary surface of the interface. */
+@utility panel {
+  border-radius: 26px;
+  background-color: color-mix(in oklab, var(--frost) 70%, transparent);
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 0 0 1px oklch(0.218 0.033 251.3 / 0.06),
+    var(--shadow-panel);
+  border-top: 1px solid oklch(1 0 0 / 0.9);
+}
+
+@utility panel-sm {
+  border-radius: 18px;
+  background-color: color-mix(in oklab, var(--frost) 65%, transparent);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 0 0 1px oklch(0.218 0.033 251.3 / 0.06);
+  border-top: 1px solid oklch(1 0 0 / 0.85);
+}
