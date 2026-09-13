@@ -4,7 +4,7 @@ import base64
 from PIL import Image, ImageChops, ImageEnhance
 import io
 
-def generate_ela_heatmap_base64(image_path: str, quality: int = 90) -> tuple[str, float]:
+def generate_ela_heatmap_base64(image_path: str, quality: int = 90):
     """
     Performs Error Level Analysis (ELA) on the image.
     ELA highlights areas that have been modified or have different compression levels,
