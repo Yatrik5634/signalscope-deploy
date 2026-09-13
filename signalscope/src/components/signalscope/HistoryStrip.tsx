@@ -28,7 +28,7 @@ export function HistoryStrip({ entries, activeId, onOpen }: Props) {
       </div>
       <div className="flex gap-3 overflow-x-auto pb-1">
         {entries.map((entry) => {
-          const isAi = entry.result.label === "AI-generated";
+          const isAi = entry.result.verdict === "likely AI-generated";
           return (
             <button
               key={entry.id}
