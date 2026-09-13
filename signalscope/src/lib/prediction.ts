@@ -67,7 +67,7 @@ const REQUEST_TIMEOUT_MS = 20000;
 
 /** Flip to false once the FastAPI backend is live (see predictReal below). */
 const USE_MOCK = false;
-const PREDICT_ENDPOINT = "http://localhost:8000/predict";
+const PREDICT_ENDPOINT = 'https://signalscope-deploy.onrender.com/predict';
 
 /* ------------------------------------------------------------ validation */
 
