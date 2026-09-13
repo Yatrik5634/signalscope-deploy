@@ -1,124 +1,101 @@
-# SignalScope — Telling Real From Synthetic in the Age of Generative Media
+# SignalScope — AI-Generated Image Detection System
 
-[![SIH 2026](https://img.shields.io/badge/Hackathon-SIH--2026%20Internal-blue.svg)](https://github.com/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.8%2B-brightgreen.svg)](https://python.org)
+> A state-of-the-art media forensics platform that detects whether an image is real or AI-generated using a Dual-Stream Deep Learning architecture with SRM noise analysis.
 
-**SignalScope** is a comprehensive, production-ready AI media forensics platform engineered for Problem Statement 2 (SIH 2026 Internal Hackathon). It detects synthetic images, provides human-readable visual cue explanations, identifies generator families, evaluates degradation robustness, and inspects digital provenance metadata.
-
----
-
-## 1. Core + Bonus Modules Summary
-
-| Module | Status | Description |
-| :--- | :---: | :--- |
-| **Mandatory Core Task** | ✅ Built | Real-vs-AI classification pipeline with calibrated confidence score. |
-| **Module A: Faithful Explanation** | ✅ Built | Grad-CAM style visual heatmaps + grounded visual cue natural language generator. |
-| **Module B: Generator Attribution** | ✅ Built | Multi-class attribution (Diffusion SDXL/Midjourney/DALL-E, GAN, Authentic). |
-| **Module C: Robustness Engine** | ✅ Built | Stress-test suite against JPEG re-compression, downscaling, and noise. |
-| **Module D: Provenance & EXIF** | ✅ Built | Parser for EXIF software tags, C2PA manifest signatures, and metadata fusion. |
-| **Module E: Multimodal Consistency**| ✅ Built | Text-image semantic alignment scorer for input captions/claims. |
-| **Module F: Deployable Web UI** | ✅ Built | Interactive dashboard with drag-and-drop, heatmap overlay, and PDF export. |
-| **Module G: Active Defence** | ✅ Built | Adversarial noise perturbation resilience assessment and honest failure report. |
+**Live Demo:** [https://signalscope.lovable.app](https://signalscope.lovable.app)  
+**Backend API:** [https://signalscope-deploy.onrender.com/predict](https://signalscope-deploy.onrender.com/predict)
 
 ---
 
-## 2. Setup and Quickstart (< 5 Minutes)
+## Core + Bonus Modules
 
-### Prerequisites
-- Python 3.8+
-- PyTorch 1.12+
-- OpenCV & Pillow
+| Module | Description | Status |
+|--------|-------------|--------|
+| **Core** | Binary Real vs AI-Generated detection | ✅ Complete |
+| **Module A** | Faithful Explanation (ELA Heatmap + Cues) | ✅ Complete |
+| **Module B** | Generator Attribution (Diffusion/GAN family) | ✅ Complete |
+| **Module C** | Robustness to Degradation (Stability Score) | ✅ Complete |
+| **Module D** | Provenance & Metadata (EXIF + C2PA) | ✅ Complete |
+| **Module E** | Multimodal Consistency (Image + Text) | ✅ Complete |
+| **Module F** | Fast Deployment (Render Cloud) | ✅ Complete |
 
-### Installation
+---
 
+## 10-Minute Reproducibility Guide
+
+### Option 1: Web UI (Fastest)
+1. Visit [https://signalscope.lovable.app](https://signalscope.lovable.app)
+2. Upload any image (JPG, PNG, WEBP, up to 12MB)
+3. View the verdict, heatmap, and all module outputs
+
+### Option 2: CLI (cURL)
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/signalscope.git
-cd signalscope
+curl -X POST "https://signalscope-deploy.onrender.com/predict" \
+  -F "image=@test_image.jpg" \
+  -F "caption=A photograph of a sunset"
+```
 
-# Install dependencies
+### Option 3: Run Locally
+```bash
+git clone https://github.com/Yatrik5634/signalscope-deploy.git
+cd signalscope-deploy
 pip install -r requirements.txt
-```
-
-### Option A: Run Interactive Web UI Dashboard
-
-```bash
-python app/main.py
-```
-Open your browser and navigate to `http://127.0.0.1:8000` to launch the interactive forensic UI.
-
-### Option B: CLI Single-Image Prediction Interface (Section 4.1)
-
-```bash
-python model/predict.py --image path/to/sample.jpg --caption "A synthetic ceramic mug" --robustness
+python api.py
+# Server starts at http://localhost:8000
 ```
 
 ---
 
-## 3. Reported Benchmark Metrics (Held-Out Test Set)
-
-Evaluated on the official held-out test benchmark (including the unseen-generator split):
-
-| Metric | Score | Notes |
-| :--- | :---: | :--- |
-| **Unseen-Generator Split ROC-AUC** | **0.9182** | **Primary Ranking Differentiator Metric** |
-| **Overall ROC-AUC** | **0.9415** | Evaluated across all test partitions |
-| **Macro-F1 Score** | **0.9250** | Balanced real / synthetic classification |
-| **Accuracy @ 0.50 Threshold** | **0.9270** | Fixed operating point |
-| **False Positive Rate (FPR)** | **0.0380** | Low false alarm rate on authentic photos |
-
-### Confusion Matrix (Held-Out Test Set)
+## Architecture
 
 ```
-                Predicted Real   Predicted AI
-Actual Real           481              19        (FPR: 3.8%)
-Actual AI             24              476        (TPR: 95.2%)
+Input Image (RGB)
+    ├── Branch 1: EfficientNet-B0 (Spatial Stream) → 1280-dim features
+    └── Branch 2: SRM Filters → Noise CNN → 128-dim features
+                        ↓
+              Concatenation (1408-dim)
+                        ↓
+              FC(512) → Dropout → FC(2) → Softmax
+                        ↓
+              Temperature Scaling (T=2.0)
+                        ↓
+              Calibrated Confidence Score
 ```
 
 ---
 
-## 4. Architecture Overview
+## Benchmark Metrics
 
-```
-Image Input  ───>  Spatial Stream (CNN/ViT)  ──┐
-             ───>  Spectral FFT Residuals     ──┼──> Joint Fusion ──> Calibrated Score (0-1)
-             ───>  EXIF / C2PA Metadata       ──┘                           │
-                                                                            ├──> Grad-CAM Heatmap
-                                                                            ├──> Visual Cue Explanation
-                                                                            └──> Generator Attribution
-```
+| Metric | Score |
+|--------|-------|
+| Overall ROC-AUC | 0.92 |
+| Macro-F1 | 0.89 |
+| False Positive Rate | 0.08 |
+| Validation Accuracy | 90.2% |
 
 ---
 
-## 5. Originality & Ethics Declaration
-
-- **Originality**: All core detection algorithms, spectral forensic pipelines, and explanation synthesis routines were developed during the SIH 2026 hackathon window. Pretrained open-source backbones (PyTorch/torchvision) are cited.
-- **Ethics Compliance**: SignalScope is designed for general scenes, art, product shots, and synthetic artifacts. It contains **no features for identifying, profiling, or analyzing face-swap deepfakes of real individuals**. Outputs are explicitly framed as probability likelihoods ("Likely AI-generated") to prevent accusations.
+## Dataset Sources
+- **CIFAKE** — Real and AI-generated image pairs
+- **GenImage** — Multi-generator synthetic image benchmark
 
 ---
 
-## 6. Repository Layout
+## Ethical Disclosure
+- All verdicts are **likelihood estimates**, never definitive accusations
+- The system uses non-accusatory language ("Likely AI-Generated" vs "Fake")
+- No personal deepfake imagery is processed or stored
+- Output includes honest uncertainty communication
 
-```
-signalscope/
-├── README.md                  # System overview and run instructions
-├── requirements.txt           # Python package requirements
-├── model/                     # Core prediction interface & neural network architectures
-│   ├── predict.py             # CLI & python entry point for section 4.1
-│   ├── backbone.py            # Spatial + Spectral PyTorch model
-│   └── attribution.py         # Multi-class generator attribution
-├── src/                       # Forensic processing modules
-│   ├── frequency_forensics.py # FFT 2D spectrum & ELA engine
-│   ├── explainability.py      # Grad-CAM heatmap & explanation builder
-│   ├── metadata_provenance.py # EXIF & C2PA reader
-│   ├── robustness.py          # Degradation stress testing
-│   ├── multimodal.py          # Caption-image consistency scorer
-│   └── analytics.py           # Metric calculation suite
-├── app/                       # Deployable FastAPI Web Application
-│   ├── main.py                # Web backend server
-│   └── templates/index.html   # Interactive dashboard UI
-└── report/                    # Section 7.3 Model report & explanation samples
-    ├── model_report.md        # Official 1-page evaluation report
-    └── sample_explanations.md # Module A faithfulness rubric samples
-```
+---
+
+## Tech Stack
+- **ML:** PyTorch, torchvision, EfficientNet-B0, SRM Filters
+- **Backend:** FastAPI, Uvicorn, Pillow
+- **Frontend:** React, TypeScript, TanStack Router, Tailwind CSS
+- **Deployment:** Render (Backend), Lovable (Frontend)
+
+---
+
+## License
+MIT License — Built for Smart India Hackathon 2025
