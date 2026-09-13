@@ -63,7 +63,7 @@ export const ACCEPTED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/we
 export const ACCEPTED_LABEL = "JPG · PNG · WEBP";
 export const MAX_BYTES = 12 * 1024 * 1024;
 export const MAX_LABEL = "12 MB";
-const REQUEST_TIMEOUT_MS = 20000;
+const REQUEST_TIMEOUT_MS = 120000;
 
 /** Flip to false once the FastAPI backend is live (see predictReal below). */
 const USE_MOCK = false;
