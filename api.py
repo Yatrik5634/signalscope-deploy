@@ -13,6 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "signals
 
 # Import our new SignalScope Modules
 from signalscope.advanced_dual_branch import TwoStreamFusionNetwork
+from forensics.ela import generate_ela_heatmap_base64
 
 app = FastAPI()
 
@@ -89,6 +90,9 @@ async def predict_image(file: UploadFile = File(alias="image")):
             explanation.append("SRM Filter Check: The statistical noise fingerprint is ambiguous, possibly due to image compression.")
             explanation.append("Overall Analysis: The AI model detected mixed signals. We cannot confidently classify this image.")
 
+        # Generate Pixel-Perfect ELA Heatmap before deleting file
+        heatmap_base64 = generate_ela_heatmap_base64(temp_file)
+        
         # Cleanup
         if os.path.exists(temp_file):
             os.remove(temp_file)
@@ -96,7 +100,7 @@ async def predict_image(file: UploadFile = File(alias="image")):
         mapped_result = {
             "label": label,
             "confidence": confidence,
-            "heatmap": "", # We don't have Grad-CAM setup for the new PyTorch model yet!
+            "heatmap": heatmap_base64,
             "explanation": explanation
         }
             
