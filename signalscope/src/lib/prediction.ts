@@ -17,13 +17,34 @@ import mockHeatmap from "@/assets/mock-heatmap.png";
  * implementation for the real endpoint requires no component changes.
  */
 
-export type PredictionLabel = "AI-generated" | "Real";
+export type PredictionLabel = "AI-generated" | "Real" | "Uncertain";
 
 export interface PredictionResult {
-  label: PredictionLabel;
+  verdict: string;
   confidence: number;
-  heatmap: string;
-  explanation: string[];
+  threshold_used: number;
+  explanation: {
+    summary: string;
+    cues: string[];
+    heatmap_base64: string;
+  };
+  attribution: {
+    family: string;
+    family_confidence: number;
+  };
+  metadata: {
+    c2pa_present: boolean;
+    c2pa_valid: boolean;
+    exif_summary: Record<string, string>;
+  };
+  robustness: {
+    stability_score: number;
+    degradation_delta: number;
+  };
+  multimodal_consistency: {
+    score: number;
+    is_consistent: boolean;
+  };
 }
 
 /** User-facing error codes. Never surface raw technical errors. */
@@ -43,84 +64,67 @@ const MESSAGES: Record<PredictionErrorCode, string> = {
   UPLOAD_FAILED: "The image couldn't be uploaded. Please try again.",
   BACKEND_UNAVAILABLE: "The analysis service is unavailable right now. Please try again shortly.",
   PREDICTION_FAILED: "We couldn't analyze this image. Please try a different one.",
-  TIMEOUT: "The analysis took too long to respond. Please try again.",
+  TIMEOUT: "The analysis took too long. Please try a smaller image.",
 };
-
-export class PredictionError extends Error {
-  code: PredictionErrorCode;
-  constructor(code: PredictionErrorCode) {
-    super(MESSAGES[code]);
-    this.code = code;
-    this.name = "PredictionError";
-  }
-}
 
 export const friendlyMessage = (code: PredictionErrorCode) => MESSAGES[code];
 
+export class PredictionError extends Error {
+  constructor(public code: PredictionErrorCode) {
+    super(code);
+  }
+}
+
 /* ---------------------------------------------------------------- config */
 
-export const ACCEPTED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-export const ACCEPTED_LABEL = "JPG · PNG · WEBP";
-export const MAX_BYTES = 12 * 1024 * 1024;
+const ACCEPTED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+export const MAX_SIZE_BYTES = 12 * 1024 * 1024;
+export const ACCEPTED_LABEL = "JPG, PNG, WEBP";
 export const MAX_LABEL = "12 MB";
-const REQUEST_TIMEOUT_MS = 120000;
+const REQUEST_TIMEOUT_MS = 30000;
 
-/** Flip to false once the FastAPI backend is live (see predictReal below). */
 const USE_MOCK = false;
-const PREDICT_ENDPOINT = 'https://signalscope-deploy.onrender.com/predict';
+const PREDICT_ENDPOINT = "https://signalscope-deploy.onrender.com/predict";
 
 /* ------------------------------------------------------------ validation */
 
-export function validateImage(file: File | null | undefined): PredictionErrorCode | null {
+export function validateImage(file: File | undefined | null): PredictionErrorCode | null {
   if (!file) return "NO_IMAGE";
-  const type = file.type.toLowerCase();
-  const nameOk = /\.(jpe?g|png|webp)$/i.test(file.name);
-  if (!ACCEPTED_TYPES.includes(type) && !nameOk) return "INVALID_TYPE";
-  if (file.size === 0) return "UPLOAD_FAILED";
-  if (file.size > MAX_BYTES) return "TOO_LARGE";
+  if (!ACCEPTED_TYPES.includes(file.type)) return "INVALID_TYPE";
+  if (file.size > MAX_SIZE_BYTES) return "TOO_LARGE";
   return null;
 }
 
 /* ------------------------------------------------------------------ mock */
 
-const AI_EXPLANATION = [
-  "Unusual texture patterns in smooth regions",
-  "Lighting inconsistency across the frame",
-  "Repeating frequency signature in the background",
-];
-
-const REAL_EXPLANATION = [
-  "Natural sensor noise consistent across the frame",
-  "Lighting and shadow directions agree",
-  "No repeating generator artifacts detected",
-];
-
-async function predictMock(file: File): Promise<PredictionResult> {
-  await new Promise((r) => setTimeout(r, 1800));
-
-  // Deterministic pseudo-variation so demos show both verdicts.
-  const isAi = (file.size + file.name.length) % 3 !== 0;
-
-  return isAi
-    ? {
-        label: "AI-generated",
-        confidence: 0.88,
-        heatmap: mockHeatmap,
-        explanation: AI_EXPLANATION,
-      }
-    : {
-        label: "Real",
-        confidence: 0.79,
-        heatmap: mockHeatmap,
-        explanation: REAL_EXPLANATION,
-      };
+async function predictMock(file: File, caption?: string): Promise<PredictionResult> {
+  await new Promise((r) => setTimeout(r, 2000));
+  return {
+    verdict: "likely AI-generated",
+    confidence: 0.88,
+    threshold_used: 0.6,
+    explanation: {
+      summary: "Primary Detection: Our Dual-Branch network identified AI-generated origins with a calibrated confidence of 88.0%.",
+      cues: [
+        "Noise Domain Analysis (SRM): High-frequency artifacts and microscopic synthetic noise traces were detected in the pixel structure.",
+      ],
+      heatmap_base64: mockHeatmap,
+    },
+    attribution: { family: "Stable Diffusion Class", family_confidence: 0.85 },
+    metadata: { c2pa_present: false, c2pa_valid: false, exif_summary: {} },
+    robustness: { stability_score: 0.95, degradation_delta: 0.02 },
+    multimodal_consistency: { score: 0.9, is_consistent: true },
+  };
 }
 
 /* ------------------------------------------------------------- real call */
 
-async function predictReal(file: File): Promise<PredictionResult> {
+async function predictReal(file: File, caption?: string): Promise<PredictionResult> {
   const body = new FormData();
   body.append("image", file);
+  if (caption) {
+    body.append("caption", caption);
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -149,29 +153,21 @@ async function predictReal(file: File): Promise<PredictionResult> {
   return normalize(data);
 }
 
-function normalize(data: unknown): PredictionResult {
-  const raw = data as Partial<PredictionResult> | null;
-  const label = raw?.label === "Real" ? "Real" : raw?.label === "AI-generated" ? "AI-generated" : null;
-  const confidence = typeof raw?.confidence === "number" ? raw.confidence : null;
-  if (!label || confidence === null || Number.isNaN(confidence)) {
+function normalize(data: any): PredictionResult {
+  if (!data || !data.verdict || typeof data.confidence !== "number") {
     throw new PredictionError("PREDICTION_FAILED");
   }
-  return {
-    label,
-    confidence: Math.min(1, Math.max(0, confidence > 1 ? confidence / 100 : confidence)),
-    heatmap: typeof raw?.heatmap === "string" && raw.heatmap ? raw.heatmap : mockHeatmap,
-    explanation: Array.isArray(raw?.explanation) ? raw!.explanation.filter((x) => typeof x === "string") : [],
-  };
+  return data as PredictionResult;
 }
 
 /* ------------------------------------------------------------------- api */
 
 /** The single entry point every component uses to get a prediction. */
-export async function predictImage(file: File | null): Promise<PredictionResult> {
+export async function predictImage(file: File | null, caption?: string): Promise<PredictionResult> {
   const problem = validateImage(file);
   if (problem) throw new PredictionError(problem);
   try {
-    return USE_MOCK ? await predictMock(file as File) : await predictReal(file as File);
+    return USE_MOCK ? await predictMock(file as File, caption) : await predictReal(file as File, caption);
   } catch (err) {
     if (err instanceof PredictionError) throw err;
     throw new PredictionError("PREDICTION_FAILED");
@@ -180,8 +176,8 @@ export async function predictImage(file: File | null): Promise<PredictionResult>
 
 /* --------------------------------------------------------- presentation */
 
-export const verdictText = (label: PredictionLabel) =>
-  label === "AI-generated" ? "Likely AI-generated" : "Likely Real";
+export const verdictText = (label: string) =>
+  label === "AI-generated" ? "Likely AI-generated" : label === "Real" ? "Likely Real" : "Uncertain";
 
 export const confidencePercent = (confidence: number) => Math.round(confidence * 100);
 
