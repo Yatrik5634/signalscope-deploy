@@ -91,7 +91,9 @@ async def predict_image(file: UploadFile = File(alias="image")):
             explanation.append("Overall Analysis: The AI model detected mixed signals. We cannot confidently classify this image.")
 
         # Generate Pixel-Perfect ELA Heatmap before deleting file
-        heatmap_base64 = generate_ela_heatmap_base64(temp_file)
+        heatmap_base64, affected_pct = generate_ela_heatmap_base64(temp_file)
+        
+        explanation.append(f"Pixel Analysis: We scanned 100% of the pixels. Approximately {affected_pct}% of the pixels show abnormal AI noise residuals.")
         
         # Cleanup
         if os.path.exists(temp_file):
