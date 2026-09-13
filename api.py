@@ -9,7 +9,7 @@ from torchvision import transforms
 from PIL import Image
 
 # Add SignalScope to Python path so its internal imports work
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "SignalScope")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "signalscope")))
 
 # Import our new SignalScope Modules
 from models.fusion_model import SignalScopeFusionModel
