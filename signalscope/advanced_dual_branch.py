@@ -9,7 +9,9 @@ from torchvision import transforms, models
 from PIL import Image
 from tqdm import tqdm
 import numpy as np
-
+from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
+import io
+import random
 # ==============================================================================
 # 1. SRM Filter Definition
 # ==============================================================================
@@ -58,6 +60,15 @@ class SRMConv2d(nn.Module):
 # ==============================================================================
 # 2. Custom Dual-Stream Dataset
 # ==============================================================================
+def random_jpeg_compression(img):
+    if random.random() < 0.3:
+        quality = random.randint(50, 90)
+        out = io.BytesIO()
+        img.save(out, format='JPEG', quality=quality)
+        out.seek(0)
+        img = Image.open(out).convert('RGB')
+    return img
+
 class TwoStreamDataset(Dataset):
     def __init__(self, data_dir, is_train=True, image_size=224):
         self.data_dir = data_dir
@@ -79,9 +90,12 @@ class TwoStreamDataset(Dataset):
         # RGB Image Augmentations
         if is_train:
             self.transform = transforms.Compose([
+                transforms.Lambda(random_jpeg_compression),
                 transforms.Resize((image_size + 32, image_size + 32)),
                 transforms.RandomCrop((image_size, image_size)),
                 transforms.RandomHorizontalFlip(),
+                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
+                transforms.RandomApply([transforms.GaussianBlur(3, sigma=(0.1, 1.0))], p=0.2),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
             ])
@@ -246,6 +260,10 @@ def train_model(data_dir, output_dir, epochs=30, batch_size=16, lr=1e-4):
         val_correct = 0
         val_total = 0
         
+        all_labels = []
+        all_preds = []
+        all_probs = []
+        
         with torch.no_grad():
             for rgb_img, srm_img, labels in tqdm(val_loader, desc="Validation", leave=False):
                 rgb_img, srm_img, labels = rgb_img.to(device), srm_img.to(device), labels.to(device)
@@ -254,15 +272,37 @@ def train_model(data_dir, output_dir, epochs=30, batch_size=16, lr=1e-4):
                 loss = criterion(outputs, labels)
                 
                 val_loss += loss.item()
+                
+                probs = F.softmax(outputs, dim=1)
                 _, predicted = torch.max(outputs.data, 1)
+                
                 val_total += labels.size(0)
                 val_correct += (predicted == labels).sum().item()
+                
+                all_labels.extend(labels.cpu().numpy())
+                all_preds.extend(predicted.cpu().numpy())
+                all_probs.extend(probs[:, 1].cpu().numpy()) # Probability of class 1 (AI)
                 
         val_acc = 100 * val_correct / val_total
         avg_val_loss = val_loss / len(val_loader)
         
+        # Calculate Advanced Metrics
+        try:
+            roc_auc = roc_auc_score(all_labels, all_probs)
+            macro_f1 = f1_score(all_labels, all_preds, average='macro')
+            cm = confusion_matrix(all_labels, all_preds)
+            # cm format: [[TN, FP], [FN, TP]]
+            tn, fp, fn, tp = cm.ravel() if cm.size == 4 else (0,0,0,0)
+            fpr = fp / (fp + tn) if (fp + tn) > 0 else 0.0
+        except ValueError:
+            # Handles cases where only one class is present in validation batch
+            roc_auc, macro_f1, fpr = 0.0, 0.0, 0.0
+            cm = np.array([[0,0],[0,0]])
+            
         print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.2f}%")
         print(f"Val Loss:   {avg_val_loss:.4f} | Val Acc:   {val_acc:.2f}%")
+        print(f"Metrics -> ROC-AUC: {roc_auc:.4f} | Macro-F1: {macro_f1:.4f} | FPR: {fpr:.4f}")
+        print(f"Confusion Matrix:\n{cm}")
         
         scheduler.step(avg_val_loss)
         
