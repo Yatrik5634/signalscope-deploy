@@ -49,6 +49,7 @@ function readAsDataUrl(file: File) {
 
 function HomePage() {
   const [image, setImage] = useState<SelectedImage | null>(null);
+  const [caption, setCaption] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewed, setViewed] = useState<ViewedResult | null>(null);
@@ -59,7 +60,7 @@ function HomePage() {
         try {
           return JSON.parse(saved);
         } catch {
-          return [];
+          // ignore
         }
       }
     }
@@ -71,8 +72,6 @@ function HomePage() {
       localStorage.setItem("signalscope-history", JSON.stringify(history));
     } catch (e) {
       console.warn("Could not save history to localStorage. Limit exceeded.", e);
-      // If we hit the quota, we could potentially clear old history here,
-      // but catching the error is enough to prevent the page from crashing.
     }
   }, [history]);
 
@@ -96,7 +95,7 @@ function HomePage() {
     setError(null);
     setIsAnalyzing(true);
     try {
-      const result = await predictImage(image.file);
+      const result = await predictImage(image.file, caption);
       const entry: HistoryEntry = {
         id: `${Date.now()}-${image.name}`,
         order: history.length + 1,
@@ -140,6 +139,8 @@ function HomePage() {
         <Hero />
         <UploadPanel
           image={image}
+          caption={caption}
+          setCaption={setCaption}
           isAnalyzing={isAnalyzing}
           error={error}
           onSelect={handleSelect}
