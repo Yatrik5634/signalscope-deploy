@@ -82,13 +82,20 @@ export function UploadPanel({ image, isAnalyzing, error, onSelect, onRemove, onA
         >
           {image ? (
             <div className="flex flex-col items-center gap-4 md:flex-row md:gap-6">
-              <img
-                src={image.dataUrl}
-                alt="Selected image preview"
-                width={112}
-                height={112}
-                className="size-28 shrink-0 rounded-xl object-cover ring-1 ring-foreground/5"
-              />
+              <div className="relative size-28 shrink-0 overflow-hidden rounded-xl ring-1 ring-foreground/5">
+                <img
+                  src={image.dataUrl}
+                  alt="Selected image preview"
+                  width={112}
+                  height={112}
+                  className="size-full object-cover"
+                />
+                {isAnalyzing && (
+                  <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden bg-primary/10">
+                    <div className="absolute inset-x-0 top-0 h-full scan-vertical bg-gradient-to-b from-transparent via-primary/60 to-transparent" />
+                  </div>
+                )}
+              </div>
               <div className="min-w-0 flex-1 text-center md:text-left">
                 <p className="truncate text-base font-semibold">{image.name}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
