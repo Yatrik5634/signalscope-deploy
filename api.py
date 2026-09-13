@@ -13,7 +13,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "signals
 
 # Import our new SignalScope Modules
 from signalscope.advanced_dual_branch import TwoStreamFusionNetwork
-from forensics.ela import generate_ela_heatmap_base64
+from signalscope.forensics.ela import generate_ela_heatmap_base64
 
 app = FastAPI()
 
