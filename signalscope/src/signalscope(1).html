@@ -1,0 +1,1649 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SignalScope — Is this image AI-generated?</title>
+    <meta
+      name="description"
+      content="SignalScope analyzes an image and reports a likely AI-generated or likely real verdict with a confidence score, a Grad-CAM style heatmap and a plain-language explanation."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="SignalScope — AI image detector" />
+    <meta
+      property="og:description"
+      content="Upload an image, get a likelihood score, a heatmap of the signals the model reacted to, and a readable explanation."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* ============================================================
+         SignalScope — "Frost Evidence Rig" design system (standalone)
+         Same tokens as src/styles.css in the React project.
+         ============================================================ */
+      :root {
+        --radius: 12px;
+        --background: oklch(0.949 0.009 242.8);
+        --foreground: oklch(0.218 0.033 251.3);
+        --muted-foreground: oklch(0.455 0.028 250.4);
+        --muted-surface: oklch(0.901 0.018 245.4);
+        --frost: oklch(1 0 0);
+        --primary: oklch(0.581 0.229 263.9);
+        --primary-foreground: oklch(1 0 0);
+        --primary-dark: oklch(0.512 0.216 263.6);
+        --primary-soft: oklch(0.942 0.027 265.5);
+        --verdict-ai: oklch(0.626 0.193 23);
+        --verdict-ai-soft: oklch(0.952 0.021 17.5);
+        --verdict-real: oklch(0.618 0.13 160.7);
+        --verdict-real-soft: oklch(0.953 0.02 164.6);
+        --signal-med: oklch(0.784 0.137 70.2);
+        --placeholder: oklch(0.88 0.016 245.1);
+        --panel-tint: oklch(0.901 0.018 245.4);
+        --border: oklch(0.877 0.018 245.4);
+
+        --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+        --font-display: "Anton", "Inter", sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+        --shadow-panel: 0 40px 80px -40px oklch(0.218 0.033 251.3 / 0.45);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        font-family: var(--font-sans);
+        background-color: var(--background);
+        color: var(--foreground);
+        background-image:
+          radial-gradient(120% 90% at 15% -10%, oklch(1 0 0) 0%, oklch(1 0 0 / 0) 45%),
+          radial-gradient(120% 80% at 100% 120%, var(--panel-tint) 0%, oklch(0.901 0.018 245.4 / 0) 55%);
+        background-attachment: fixed;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: var(--font-display);
+        font-weight: 400;
+        letter-spacing: 0.01em;
+        line-height: 1.02;
+        margin: 0;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .wrap {
+        width: 100%;
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+
+      .mono {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      /* ---------------------------------------------- surfaces */
+      .panel {
+        border-radius: 26px;
+        background-color: color-mix(in oklab, var(--frost) 70%, transparent);
+        backdrop-filter: blur(20px);
+        box-shadow: 0 0 0 1px oklch(0.218 0.033 251.3 / 0.06), var(--shadow-panel);
+        border-top: 1px solid oklch(1 0 0 / 0.9);
+      }
+
+      .panel-sm {
+        border-radius: 18px;
+        background-color: color-mix(in oklab, var(--frost) 65%, transparent);
+        backdrop-filter: blur(16px);
+        box-shadow: 0 0 0 1px oklch(0.218 0.033 251.3 / 0.06);
+        border-top: 1px solid oklch(1 0 0 / 0.85);
+      }
+
+      /* ---------------------------------------------- buttons */
+      .btn {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-family: var(--font-sans);
+        font-weight: 600;
+        font-size: 14px;
+        border-radius: 999px;
+        padding: 13px 22px;
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        transition:
+          transform 0.15s ease,
+          background-color 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      .btn-primary {
+        background-color: var(--primary);
+        color: var(--primary-foreground);
+        box-shadow: 0 12px 28px -14px oklch(0.581 0.229 263.9 / 0.8);
+      }
+
+      .btn-primary:hover:not(:disabled) {
+        background-color: var(--primary-dark);
+        transform: translateY(-1px);
+      }
+
+      .btn-ghost {
+        background-color: transparent;
+        color: var(--foreground);
+        box-shadow: inset 0 0 0 1px var(--border);
+      }
+
+      .btn-ghost:hover {
+        background-color: oklch(1 0 0 / 0.6);
+      }
+
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      /* ---------------------------------------------- header */
+      header.site {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        backdrop-filter: blur(18px);
+        background-color: oklch(0.949 0.009 242.8 / 0.75);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .bar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 68px;
+        gap: 16px;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        font-family: var(--font-display);
+        font-size: 20px;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .brand .mark {
+        width: 30px;
+        height: 30px;
+        border-radius: 9px;
+        background: linear-gradient(150deg, var(--primary) 0%, var(--primary-dark) 100%);
+        display: grid;
+        place-items: center;
+        color: #fff;
+        box-shadow: 0 8px 18px -10px oklch(0.581 0.229 263.9 / 0.9);
+      }
+
+      nav.top {
+        display: flex;
+        align-items: center;
+        gap: 26px;
+      }
+
+      nav.top a {
+        font-size: 13.5px;
+        font-weight: 500;
+        color: var(--muted-foreground);
+      }
+
+      nav.top a:hover {
+        color: var(--foreground);
+      }
+
+      /* ---------------------------------------------- hero */
+      .hero {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        gap: 44px;
+        align-items: center;
+        padding: 76px 0 46px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 13px;
+        border-radius: 999px;
+        background-color: oklch(1 0 0 / 0.7);
+        box-shadow: inset 0 0 0 1px var(--border);
+        color: var(--muted-foreground);
+      }
+
+      .hero h1 {
+        font-size: clamp(44px, 6.4vw, 78px);
+        text-transform: uppercase;
+        margin: 18px 0 0;
+      }
+
+      .hero h1 em {
+        font-style: normal;
+        color: var(--primary);
+      }
+
+      .lede {
+        margin-top: 18px;
+        font-size: 16.5px;
+        line-height: 1.6;
+        color: var(--muted-foreground);
+        max-width: 46ch;
+      }
+
+      .hero-actions {
+        margin-top: 28px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .trust {
+        margin-top: 24px;
+        display: flex;
+        gap: 22px;
+        flex-wrap: wrap;
+        color: var(--muted-foreground);
+      }
+
+      .trust div strong {
+        display: block;
+        font-family: var(--font-display);
+        font-size: 22px;
+        font-weight: 400;
+        color: var(--foreground);
+      }
+
+      .plate {
+        border-radius: 26px;
+        overflow: hidden;
+        background-color: oklch(1 0 0 / 0.7);
+        box-shadow: 0 0 0 1px oklch(0.218 0.033 251.3 / 0.07), var(--shadow-panel);
+      }
+
+      .plate svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .plate-foot {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 16px;
+        border-top: 1px solid var(--border);
+        color: var(--muted-foreground);
+      }
+
+      /* ---------------------------------------------- workspace */
+      .workspace {
+        display: grid;
+        grid-template-columns: 0.92fr 1.08fr;
+        gap: 26px;
+        padding: 26px 0 12px;
+      }
+
+      .pad {
+        padding: 26px;
+      }
+
+      .sec-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 16px;
+      }
+
+      .sec-title h2 {
+        font-size: 24px;
+        text-transform: uppercase;
+      }
+
+      .chip {
+        padding: 6px 11px;
+        border-radius: 999px;
+        background-color: var(--primary-soft);
+        color: var(--primary-dark);
+      }
+
+      /* dropzone */
+      .drop {
+        border-radius: 20px;
+        border: 1.5px dashed oklch(0.455 0.028 250.4 / 0.35);
+        background-color: oklch(1 0 0 / 0.5);
+        padding: 34px 22px;
+        text-align: center;
+        cursor: pointer;
+        transition:
+          border-color 0.2s ease,
+          background-color 0.2s ease;
+      }
+
+      .drop:hover {
+        border-color: var(--primary);
+        background-color: oklch(1 0 0 / 0.75);
+      }
+
+      .drop.over {
+        border-color: var(--primary);
+        background-color: var(--primary-soft);
+      }
+
+      .drop .icon {
+        width: 52px;
+        height: 52px;
+        margin: 0 auto 14px;
+        border-radius: 16px;
+        display: grid;
+        place-items: center;
+        background-color: var(--primary-soft);
+        color: var(--primary-dark);
+      }
+
+      .drop strong {
+        font-size: 15px;
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .drop span {
+        font-size: 13px;
+        color: var(--muted-foreground);
+        line-height: 1.55;
+        display: block;
+      }
+
+      .hint {
+        margin-top: 12px;
+        color: var(--muted-foreground);
+        text-align: center;
+      }
+
+      /* preview */
+      .preview {
+        display: none;
+      }
+
+      .preview.on {
+        display: block;
+      }
+
+      .thumb {
+        border-radius: 18px;
+        overflow: hidden;
+        background-color: var(--muted-surface);
+        box-shadow: inset 0 0 0 1px var(--border);
+      }
+
+      .thumb img {
+        display: block;
+        width: 100%;
+        max-height: 300px;
+        object-fit: contain;
+        background-color: oklch(0.901 0.018 245.4);
+      }
+
+      .meta {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 7px;
+        color: var(--muted-foreground);
+      }
+
+      .meta div {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .meta b {
+        color: var(--foreground);
+        font-weight: 500;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        max-width: 62%;
+      }
+
+      .row {
+        margin-top: 16px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .alert {
+        display: none;
+        margin-top: 14px;
+        padding: 12px 14px;
+        border-radius: 14px;
+        font-size: 13.5px;
+        line-height: 1.5;
+        background-color: var(--verdict-ai-soft);
+        color: oklch(0.45 0.16 23);
+        box-shadow: inset 0 0 0 1px oklch(0.626 0.193 23 / 0.25);
+      }
+
+      .alert.on {
+        display: block;
+      }
+
+      /* loading */
+      .scan {
+        position: relative;
+        overflow: hidden;
+        border-radius: 18px;
+        background-color: var(--muted-surface);
+        box-shadow: inset 0 0 0 1px var(--border);
+      }
+
+      .scan img {
+        display: block;
+        width: 100%;
+        max-height: 300px;
+        object-fit: contain;
+        opacity: 0.45;
+        filter: saturate(0.5);
+      }
+
+      .scan .line {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 14%;
+        background: linear-gradient(90deg, transparent, oklch(0.581 0.229 263.9 / 0.55), transparent);
+        animation: sweep 2.2s linear infinite;
+      }
+
+      @keyframes sweep {
+        from {
+          transform: translateX(-120%);
+        }
+        to {
+          transform: translateX(720%);
+        }
+      }
+
+      .scan-label {
+        margin-top: 12px;
+        text-align: center;
+        color: var(--muted-foreground);
+        animation: pulse-soft 1.8s ease-in-out infinite;
+      }
+
+      @keyframes pulse-soft {
+        0%,
+        100% {
+          opacity: 0.55;
+        }
+        50% {
+          opacity: 1;
+        }
+      }
+
+      @keyframes rise-in {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .rise {
+        animation: rise-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
+      }
+
+      /* ---------------------------------------------- result */
+      .empty {
+        text-align: center;
+        padding: 46px 20px;
+        color: var(--muted-foreground);
+      }
+
+      .empty .icon {
+        width: 54px;
+        height: 54px;
+        margin: 0 auto 14px;
+        border-radius: 18px;
+        display: grid;
+        place-items: center;
+        background-color: oklch(1 0 0 / 0.7);
+        box-shadow: inset 0 0 0 1px var(--border);
+        color: var(--muted-foreground);
+      }
+
+      .verdict {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        padding: 16px 18px;
+        border-radius: 18px;
+      }
+
+      .verdict.ai {
+        background-color: var(--verdict-ai-soft);
+        box-shadow: inset 0 0 0 1px oklch(0.626 0.193 23 / 0.28);
+      }
+
+      .verdict.real {
+        background-color: var(--verdict-real-soft);
+        box-shadow: inset 0 0 0 1px oklch(0.618 0.13 160.7 / 0.28);
+      }
+
+      .verdict .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        flex: none;
+      }
+
+      .verdict.ai .dot {
+        background-color: var(--verdict-ai);
+      }
+
+      .verdict.real .dot {
+        background-color: var(--verdict-real);
+      }
+
+      .verdict h3 {
+        font-size: 27px;
+        text-transform: uppercase;
+      }
+
+      .verdict.ai h3 {
+        color: oklch(0.5 0.17 23);
+      }
+
+      .verdict.real h3 {
+        color: oklch(0.42 0.12 160.7);
+      }
+
+      .verdict .pct {
+        margin-left: auto;
+        text-align: right;
+        font-family: var(--font-display);
+        font-size: 40px;
+        line-height: 1;
+      }
+
+      .verdict .pct small {
+        display: block;
+        font-family: var(--font-mono);
+        font-size: 10px;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted-foreground);
+        margin-top: 5px;
+      }
+
+      .scale {
+        margin-top: 16px;
+      }
+
+      .scale .track {
+        position: relative;
+        height: 10px;
+        border-radius: 999px;
+        background: linear-gradient(
+          90deg,
+          var(--verdict-real) 0%,
+          var(--signal-med) 55%,
+          var(--verdict-ai) 100%
+        );
+        opacity: 0.85;
+      }
+
+      .scale .marker {
+        position: absolute;
+        top: -6px;
+        width: 4px;
+        height: 22px;
+        border-radius: 3px;
+        background-color: var(--foreground);
+        box-shadow: 0 0 0 3px oklch(1 0 0 / 0.85);
+        transform: translateX(-50%);
+        transition: left 600ms cubic-bezier(0.32, 0.72, 0, 1);
+      }
+
+      .scale .ends {
+        margin-top: 9px;
+        display: flex;
+        justify-content: space-between;
+        color: var(--muted-foreground);
+      }
+
+      .viewer {
+        margin-top: 18px;
+        border-radius: 18px;
+        overflow: hidden;
+        background-color: var(--muted-surface);
+        box-shadow: inset 0 0 0 1px var(--border);
+      }
+
+      .viewer img {
+        display: block;
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+      }
+
+      .tabs {
+        margin-top: 12px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        appearance: none;
+        border: 0;
+        cursor: pointer;
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 9px 13px;
+        border-radius: 999px;
+        background-color: oklch(1 0 0 / 0.6);
+        box-shadow: inset 0 0 0 1px var(--border);
+        color: var(--muted-foreground);
+      }
+
+      .tab[aria-selected="true"] {
+        background-color: var(--foreground);
+        color: oklch(1 0 0);
+        box-shadow: none;
+      }
+
+      .why {
+        margin-top: 18px;
+        display: grid;
+        gap: 10px;
+      }
+
+      .why li {
+        list-style: none;
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+        font-size: 14px;
+        line-height: 1.55;
+        padding: 12px 14px;
+        border-radius: 14px;
+        background-color: oklch(1 0 0 / 0.55);
+        box-shadow: inset 0 0 0 1px var(--border);
+      }
+
+      .why ol {
+        margin: 0;
+        padding: 0;
+      }
+
+      .why .n {
+        font-family: var(--font-mono);
+        font-size: 10.5px;
+        color: var(--primary-dark);
+        background-color: var(--primary-soft);
+        border-radius: 7px;
+        padding: 3px 6px;
+        flex: none;
+        margin-top: 1px;
+      }
+
+      .note {
+        margin-top: 16px;
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: var(--muted-foreground);
+      }
+
+      /* ---------------------------------------------- history */
+      .history {
+        padding: 30px 0 6px;
+      }
+
+      .strip {
+        display: flex;
+        gap: 12px;
+        overflow-x: auto;
+        padding: 4px 2px 10px;
+      }
+
+      .card {
+        width: 208px;
+        flex: none;
+        border: 0;
+        padding: 10px;
+        text-align: left;
+        cursor: pointer;
+        font-family: inherit;
+        border-radius: 18px;
+        transition: transform 0.15s ease;
+      }
+
+      .card:hover {
+        transform: translateY(-2px);
+      }
+
+      .card img {
+        width: 100%;
+        height: 88px;
+        object-fit: cover;
+        border-radius: 12px;
+        background-color: var(--muted-surface);
+      }
+
+      .card .lab {
+        margin-top: 9px;
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12.5px;
+        font-weight: 600;
+      }
+
+      .card .lab i {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        flex: none;
+      }
+
+      .card .sub {
+        margin-top: 4px;
+        color: var(--muted-foreground);
+      }
+
+      /* ---------------------------------------------- sections */
+      section.block {
+        padding: 54px 0;
+      }
+
+      .stages {
+        margin-top: 26px;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+
+      .stage {
+        padding: 20px;
+        border-radius: 18px;
+        background-color: oklch(1 0 0 / 0.6);
+        box-shadow: inset 0 0 0 1px var(--border);
+      }
+
+      .stage .num {
+        font-family: var(--font-display);
+        font-size: 30px;
+        color: var(--primary);
+        line-height: 1;
+      }
+
+      .stage h3 {
+        font-size: 17px;
+        margin: 10px 0 7px;
+        text-transform: uppercase;
+      }
+
+      .stage p {
+        font-size: 13.5px;
+        line-height: 1.6;
+        color: var(--muted-foreground);
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 26px;
+        align-items: start;
+      }
+
+      ul.plain {
+        margin: 14px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 9px;
+      }
+
+      ul.plain li {
+        list-style: none;
+        font-size: 14px;
+        line-height: 1.6;
+        color: var(--muted-foreground);
+        padding-left: 18px;
+        position: relative;
+      }
+
+      ul.plain li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 9px;
+        width: 6px;
+        height: 6px;
+        border-radius: 999px;
+        background-color: var(--primary);
+      }
+
+      footer.site {
+        border-top: 1px solid var(--border);
+        padding: 26px 0 40px;
+        color: var(--muted-foreground);
+        font-size: 13px;
+      }
+
+      .foot-bar {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      /* ---------------------------------------------- responsive */
+      @media (max-width: 940px) {
+        .hero,
+        .workspace,
+        .split {
+          grid-template-columns: 1fr;
+        }
+        .hero {
+          padding-top: 46px;
+          gap: 30px;
+        }
+        .stages {
+          grid-template-columns: 1fr;
+        }
+        nav.top a {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap bar">
+        <div class="brand">
+          <span class="mark" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.6-3.6" />
+            </svg>
+          </span>
+          SignalScope
+        </div>
+        <nav class="top">
+          <a href="#analyze">Analyze</a>
+          <a href="#how">How it works</a>
+          <a href="#responsible">Responsible AI</a>
+        </nav>
+        <button class="btn btn-primary" id="topCta" type="button">Analyze image</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="wrap">
+        <section class="hero">
+          <div>
+            <span class="eyebrow mono">Forensic image analysis</span>
+            <h1>Real photo<br />or <em>machine<br />made?</em></h1>
+            <p class="lede">
+              Upload an image and SignalScope reports a likelihood that it was AI-generated, the confidence
+              behind that call, a heatmap of the regions that drove it, and a plain-language explanation of the
+              signals involved.
+            </p>
+            <div class="hero-actions">
+              <button class="btn btn-primary" id="heroCta" type="button">Upload an image</button>
+              <a class="btn btn-ghost" href="#how">See how it works</a>
+            </div>
+            <div class="trust">
+              <div><strong>0.00–1.00</strong><span class="mono">Confidence scale</span></div>
+              <div><strong>Grad-CAM</strong><span class="mono">Visual evidence</span></div>
+              <div><strong>Local</strong><span class="mono">Nothing leaves the page</span></div>
+            </div>
+          </div>
+
+          <div class="plate">
+            <svg viewBox="0 0 520 400" role="img" aria-label="Illustration of an image being scanned for AI-generation signals">
+              <defs>
+                <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#dfe7f2" />
+                  <stop offset="100%" stop-color="#b9c6dc" />
+                </linearGradient>
+                <radialGradient id="heat" cx="62%" cy="46%" r="42%">
+                  <stop offset="0%" stop-color="#ff5a2b" stop-opacity="0.95" />
+                  <stop offset="45%" stop-color="#ffc14a" stop-opacity="0.6" />
+                  <stop offset="100%" stop-color="#2f6bff" stop-opacity="0" />
+                </radialGradient>
+                <linearGradient id="hill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#7f8ea6" />
+                  <stop offset="100%" stop-color="#5b6a83" />
+                </linearGradient>
+              </defs>
+              <rect width="520" height="400" fill="url(#sky)" />
+              <path d="M0 268 C 90 214, 150 250, 240 208 C 330 166, 400 216, 520 168 L520 400 L0 400Z" fill="url(#hill)" />
+              <rect width="520" height="400" fill="url(#heat)" />
+              <g stroke="#ffffff" stroke-opacity="0.35" stroke-width="1">
+                <path d="M0 100h520M0 200h520M0 300h520M130 0v400M260 0v400M390 0v400" />
+              </g>
+              <g stroke="#2f6bff" stroke-width="3" fill="none">
+                <path d="M22 22h34M22 22v34M498 22h-34M498 22v34M22 378h34M22 378v-34M498 378h-34M498 378v-34" />
+              </g>
+              <g font-family="JetBrains Mono, monospace" font-size="11" fill="#3b4a63">
+                <text x="26" y="360">PLATE 01 · SCAN COMPLETE</text>
+                <text x="360" y="360">VERDICT · LIKELY AI</text>
+              </g>
+            </svg>
+            <div class="plate-foot">
+              <span class="mono">Model-agnostic frontend</span>
+              <span class="mono">POST /predict</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="workspace" id="analyze">
+          <!-- ------------------------------------------------ upload -->
+          <div class="panel pad">
+            <div class="sec-title">
+              <h2>1 · Upload</h2>
+              <span class="chip mono">JPG · PNG · WEBP</span>
+            </div>
+
+            <div class="drop" id="drop" role="button" tabindex="0" aria-label="Choose an image to analyze">
+              <div class="icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 16V4M7 9l5-5 5 5" />
+                  <path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
+                </svg>
+              </div>
+              <strong>Drag an image here</strong>
+              <span>or click to browse from your device</span>
+            </div>
+            <p class="hint mono">Max 12 MB · JPG, PNG, WEBP</p>
+            <input type="file" id="file" accept="image/jpeg,image/png,image/webp" hidden />
+
+            <div class="preview" id="preview">
+              <div class="thumb"><img id="previewImg" alt="Preview of the image you selected" /></div>
+              <div class="meta mono">
+                <div><span>File</span><b id="mName">—</b></div>
+                <div><span>Size</span><b id="mSize">—</b></div>
+                <div><span>Dimensions</span><b id="mDims">—</b></div>
+              </div>
+              <div class="row">
+                <button class="btn btn-primary" id="analyzeBtn" type="button">Analyze image</button>
+                <button class="btn btn-ghost" id="removeBtn" type="button">Remove</button>
+              </div>
+            </div>
+
+            <div class="alert" id="alert" role="alert"></div>
+          </div>
+
+          <!-- ------------------------------------------------ result -->
+          <div class="panel pad" id="resultPanel">
+            <div class="sec-title">
+              <h2>2 · Result</h2>
+              <span class="chip mono" id="statusChip">Idle</span>
+            </div>
+
+            <!-- empty -->
+            <div class="empty" id="empty">
+              <div class="icon" aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <path d="M3 15l5-4 4 3 3-2 6 4" />
+                  <circle cx="9" cy="8" r="1.6" />
+                </svg>
+              </div>
+              <p style="font-size: 14px; line-height: 1.6; max-width: 42ch; margin: 0 auto">
+                Your verdict, confidence score, heatmap and explanation appear here once you analyze an image.
+              </p>
+            </div>
+
+            <!-- loading -->
+            <div id="loading" style="display: none">
+              <div class="scan">
+                <img id="scanImg" alt="Image being analyzed" />
+                <div class="line"></div>
+              </div>
+              <p class="scan-label mono">Analyzing — extracting frequency and texture signals</p>
+            </div>
+
+            <!-- result -->
+            <div id="result" style="display: none">
+              <div class="verdict" id="verdict">
+                <span class="dot"></span>
+                <h3 id="verdictText">—</h3>
+                <div class="pct"><span id="pct">0%</span><small>Confidence</small></div>
+              </div>
+
+              <div class="scale">
+                <div class="track"><div class="marker" id="marker" style="left: 0%"></div></div>
+                <div class="ends mono"><span>More likely real</span><span>More likely AI</span></div>
+              </div>
+
+              <div class="viewer"><img id="viewerImg" alt="Analysis view of your image" /></div>
+              <div class="tabs" role="tablist">
+                <button class="tab" role="tab" data-view="original" aria-selected="true">Original</button>
+                <button class="tab" role="tab" data-view="heat" aria-selected="false">Heatmap</button>
+                <button class="tab" role="tab" data-view="overlay" aria-selected="false">Overlay</button>
+              </div>
+
+              <div class="why">
+                <p class="mono" style="color: var(--muted-foreground)">Why this verdict</p>
+                <ol id="whyList"></ol>
+              </div>
+
+              <p class="note">
+                Confidence is a likelihood, not proof. Detector outputs can be wrong in both directions — use them
+                as one signal among several, never as the sole basis for an accusation.
+              </p>
+
+              <div class="row">
+                <button class="btn btn-primary" id="againBtn" type="button">Analyze another image</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="history" id="historySection" hidden>
+          <div class="sec-title">
+            <h2 style="font-size: 22px; text-transform: uppercase">This session</h2>
+            <span class="mono" style="color: var(--muted-foreground)">Tap a card to reopen</span>
+          </div>
+          <div class="strip" id="strip"></div>
+        </section>
+      </div>
+
+      <!-- ------------------------------------------------ how it works -->
+      <section class="block" id="how">
+        <div class="wrap">
+          <span class="eyebrow mono">Pipeline</span>
+          <h2 style="font-size: clamp(30px, 4vw, 44px); text-transform: uppercase; margin-top: 14px">
+            How SignalScope works
+          </h2>
+          <div class="stages">
+            <div class="stage">
+              <div class="num">01</div>
+              <h3>Upload image</h3>
+              <p>Choose or drag a file. The image is validated for type and size, then shown as a preview before anything runs.</p>
+            </div>
+            <div class="stage">
+              <div class="num">02</div>
+              <h3>Image analysis</h3>
+              <p>The frame is decoded and normalized so the classifier sees a consistent input regardless of camera or source.</p>
+            </div>
+            <div class="stage">
+              <div class="num">03</div>
+              <h3>AI detection</h3>
+              <p>A convolutional backbone scores the image as AI-generated or real. The frontend stays model-agnostic.</p>
+            </div>
+            <div class="stage">
+              <div class="num">04</div>
+              <h3>Confidence</h3>
+              <p>The raw score is reported as a confidence value between 0 and 1, shown as a likelihood rather than a certainty.</p>
+            </div>
+            <div class="stage">
+              <div class="num">05</div>
+              <h3>Visual explanation</h3>
+              <p>A Grad-CAM style heatmap highlights the regions the network relied on, so the verdict can be inspected.</p>
+            </div>
+            <div class="stage">
+              <div class="num">06</div>
+              <h3>Final result</h3>
+              <p>Verdict, confidence, heatmap and written signals are presented together, and you can immediately run another image.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------ responsible -->
+      <section class="block" id="responsible" style="padding-top: 10px">
+        <div class="wrap split">
+          <div class="panel pad">
+            <span class="eyebrow mono">Reading the output</span>
+            <h2 style="font-size: 26px; text-transform: uppercase; margin-top: 14px">What the score means</h2>
+            <ul class="plain">
+              <li>A verdict says <b>likely</b> AI-generated or <b>likely</b> real — it is never a statement of fact.</li>
+              <li>Confidence describes how strongly the model leaned one way, not the chance an image is genuine.</li>
+              <li>The heatmap shows which regions the network reacted to; it does not prove an image was synthesized.</li>
+              <li>Cropped, compressed or heavily edited images are harder to judge and can score unreliably.</li>
+            </ul>
+          </div>
+          <div class="panel pad">
+            <span class="eyebrow mono">Limits &amp; fairness</span>
+            <h2 style="font-size: 26px; text-transform: uppercase; margin-top: 14px">Use it carefully</h2>
+            <ul class="plain">
+              <li>Detectors improve alongside generators — today's accuracy is not guaranteed tomorrow.</li>
+              <li>False accusations damage people. Never publish or act on a verdict alone.</li>
+              <li>Results can vary by content type, skin tone and lighting; treat edge cases with extra caution.</li>
+              <li>This build runs entirely in the browser with mock results — no image is uploaded or stored.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap foot-bar">
+        <span>SignalScope — image authenticity analysis</span>
+        <span class="mono">Mock predictions · ready for POST /predict</span>
+      </div>
+    </footer>
+
+    <script>
+      /* ==============================================================
+         FIXED API CONTRACT — identical to src/lib/prediction.ts
+         Backend will be:  POST /predict  (multipart/form-data, field "image")
+         Response: {
+           label: "AI-generated" | "Real",
+           confidence: 0.88,                // 0..1
+           heatmap: "<url or data-uri>",
+           explanation: string[]
+         }
+         Set USE_MOCK = false once the ML service is live. The screens
+         read only from this shape, so nothing else has to change.
+         ============================================================== */
+      const USE_MOCK = true;
+      const PREDICT_ENDPOINT = "/predict";
+      const REQUEST_TIMEOUT_MS = 20000;
+
+      const ACCEPTED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+      const MAX_BYTES = 12 * 1024 * 1024;
+
+      const MESSAGES = {
+        NO_IMAGE: "Please choose an image before analyzing.",
+        INVALID_TYPE: "That file type isn't supported. Use a JPG, PNG or WEBP image.",
+        TOO_LARGE: "That image is too large. Please use a file under 12 MB.",
+        UPLOAD_FAILED: "The image couldn't be uploaded. Please try again.",
+        BACKEND_UNAVAILABLE: "The analysis service is unavailable right now. Please try again shortly.",
+        PREDICTION_FAILED: "We couldn't analyze this image. Please try a different one.",
+        TIMEOUT: "The analysis took too long to respond. Please try again.",
+      };
+
+      const AI_EXPLANATION = [
+        "Unusual texture patterns in smooth regions",
+        "Lighting inconsistency across the frame",
+        "Repeating frequency signature in the background",
+      ];
+      const REAL_EXPLANATION = [
+        "Natural sensor noise consistent across the frame",
+        "Lighting and shadow directions agree",
+        "No repeating generator artifacts detected",
+      ];
+
+      function validateImage(file) {
+        if (!file) return "NO_IMAGE";
+        const type = (file.type || "").toLowerCase();
+        const nameOk = /\.(jpe?g|png|webp)$/i.test(file.name);
+        if (!ACCEPTED_TYPES.includes(type) && !nameOk) return "INVALID_TYPE";
+        if (file.size === 0) return "UPLOAD_FAILED";
+        if (file.size > MAX_BYTES) return "TOO_LARGE";
+        return null;
+      }
+
+      /* ------------------------------------------------------- mock */
+      async function predictMock(file) {
+        await new Promise((r) => setTimeout(r, 1800));
+        // Deterministic variation so demos show both verdicts.
+        const isAi = (file.size + file.name.length) % 3 !== 0;
+        return isAi
+          ? { label: "AI-generated", confidence: 0.88, heatmap: "", explanation: AI_EXPLANATION }
+          : { label: "Real", confidence: 0.79, heatmap: "", explanation: REAL_EXPLANATION };
+      }
+
+      /* ------------------------------------------------- real backend */
+      async function predictReal(file) {
+        const body = new FormData();
+        body.append("image", file);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+        let response;
+        try {
+          response = await fetch(PREDICT_ENDPOINT, { method: "POST", body, signal: controller.signal });
+        } catch (err) {
+          clearTimeout(timer);
+          throw new Error(err && err.name === "AbortError" ? MESSAGES.TIMEOUT : MESSAGES.BACKEND_UNAVAILABLE);
+        }
+        clearTimeout(timer);
+        if (response.status >= 500) throw new Error(MESSAGES.BACKEND_UNAVAILABLE);
+        if (!response.ok) throw new Error(MESSAGES.PREDICTION_FAILED);
+        const raw = await response.json();
+        const confidence = Number(raw.confidence);
+        if (raw.label !== "Real" && raw.label !== "AI-generated") throw new Error(MESSAGES.PREDICTION_FAILED);
+        if (!Number.isFinite(confidence)) throw new Error(MESSAGES.PREDICTION_FAILED);
+        return {
+          label: raw.label,
+          confidence: Math.min(1, Math.max(0, confidence > 1 ? confidence / 100 : confidence)),
+          heatmap: typeof raw.heatmap === "string" ? raw.heatmap : "",
+          explanation: Array.isArray(raw.explanation) ? raw.explanation.filter((x) => typeof x === "string") : [],
+        };
+      }
+
+      async function predictImage(file) {
+        const problem = validateImage(file);
+        if (problem) throw new Error(MESSAGES[problem]);
+        return USE_MOCK ? predictMock(file) : predictReal(file);
+      }
+
+      /* ================================================== presentation */
+      const $ = (id) => document.getElementById(id);
+      const drop = $("drop");
+      const fileInput = $("file");
+      const preview = $("preview");
+      const alertBox = $("alert");
+      const empty = $("empty");
+      const loading = $("loading");
+      const result = $("result");
+      const statusChip = $("statusChip");
+      const analyzeBtn = $("analyzeBtn");
+
+      const state = { file: null, dataUrl: "", views: {}, result: null, history: [] };
+
+      function fail(message) {
+        alertBox.textContent = message;
+        alertBox.classList.add("on");
+      }
+
+      function clearFail() {
+        alertBox.classList.remove("on");
+        alertBox.textContent = "";
+      }
+
+      function setStatus(text) {
+        statusChip.textContent = text;
+      }
+
+      function formatBytes(bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+      }
+
+      /* ------------------------------------------------- file intake */
+      drop.addEventListener("click", () => fileInput.click());
+      drop.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          fileInput.click();
+        }
+      });
+      ["dragenter", "dragover"].forEach((ev) =>
+        drop.addEventListener(ev, (e) => {
+          e.preventDefault();
+          drop.classList.add("over");
+        }),
+      );
+      ["dragleave", "drop"].forEach((ev) =>
+        drop.addEventListener(ev, (e) => {
+          e.preventDefault();
+          drop.classList.remove("over");
+        }),
+      );
+      drop.addEventListener("drop", (e) => {
+        const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if (file) handleFile(file);
+      });
+      fileInput.addEventListener("change", () => {
+        if (fileInput.files && fileInput.files[0]) handleFile(fileInput.files[0]);
+      });
+
+      function handleFile(file) {
+        clearFail();
+        const problem = validateImage(file);
+        if (problem) {
+          fail(MESSAGES[problem]);
+          return;
+        }
+        state.file = file;
+        const reader = new FileReader();
+        reader.onload = () => {
+          state.dataUrl = String(reader.result);
+          const img = new Image();
+          img.onload = () => {
+            $("mDims").textContent = img.naturalWidth + " × " + img.naturalHeight;
+          };
+          img.src = state.dataUrl;
+          $("previewImg").src = state.dataUrl;
+          $("mName").textContent = file.name;
+          $("mSize").textContent = formatBytes(file.size);
+          preview.classList.add("on");
+          drop.style.display = "none";
+          document.querySelector(".hint").style.display = "none";
+          showEmpty("Ready");
+        };
+        reader.onerror = () => fail(MESSAGES.UPLOAD_FAILED);
+        reader.readAsDataURL(file);
+      }
+
+      $("removeBtn").addEventListener("click", resetUpload);
+      $("againBtn").addEventListener("click", () => {
+        resetUpload();
+        document.getElementById("analyze").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+      ["topCta", "heroCta"].forEach((id) =>
+        $(id).addEventListener("click", () => {
+          if (!state.file) {
+            fileInput.click();
+          } else {
+            document.getElementById("analyze").scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        }),
+      );
+
+      function resetUpload() {
+        state.file = null;
+        state.dataUrl = "";
+        state.views = {};
+        state.result = null;
+        fileInput.value = "";
+        preview.classList.remove("on");
+        drop.style.display = "";
+        document.querySelector(".hint").style.display = "";
+        result.style.display = "none";
+        loading.style.display = "none";
+        clearFail();
+        showEmpty("Idle");
+      }
+
+      function showEmpty(label) {
+        empty.style.display = state.file || state.result ? "none" : "block";
+        if (label) setStatus(label);
+      }
+
+      /* ----------------------------------------------------- analyze */
+      analyzeBtn.addEventListener("click", async () => {
+        clearFail();
+        if (!state.file) {
+          fail(MESSAGES.NO_IMAGE);
+          return;
+        }
+        analyzeBtn.disabled = true;
+        preview.classList.remove("on");
+        empty.style.display = "none";
+        result.style.display = "none";
+        loading.style.display = "block";
+        $("scanImg").src = state.dataUrl;
+        setStatus("Analyzing");
+
+        try {
+          const prediction = await predictImage(state.file);
+          state.result = prediction;
+          state.views = buildViews(state.dataUrl, prediction);
+          renderResult(prediction);
+          pushHistory(prediction);
+          setStatus("Complete");
+        } catch (err) {
+          loading.style.display = "none";
+          preview.classList.add("on");
+          empty.style.display = "block";
+          fail(err && err.message ? err.message : MESSAGES.PREDICTION_FAILED);
+          setStatus("Failed");
+        } finally {
+          analyzeBtn.disabled = false;
+        }
+      });
+
+      /* --------------------------------------------------- rendering */
+      function renderResult(prediction) {
+        const isAi = prediction.label === "AI-generated";
+        const pct = Math.round(prediction.confidence * 100);
+        const verdict = $("verdict");
+        verdict.classList.toggle("ai", isAi);
+        verdict.classList.toggle("real", !isAi);
+        $("verdictText").textContent = isAi ? "Likely AI-generated" : "Likely Real";
+        $("pct").textContent = pct + "%";
+        $("marker").style.left = pct + "%";
+
+        const list = $("whyList");
+        list.innerHTML = "";
+        (prediction.explanation.length ? prediction.explanation : ["No additional signals reported."]).forEach(
+          (line, i) => {
+            const li = document.createElement("li");
+            const n = document.createElement("span");
+            n.className = "n";
+            n.textContent = String(i + 1).padStart(2, "0");
+            const t = document.createElement("span");
+            t.textContent = line;
+            li.appendChild(n);
+            li.appendChild(t);
+            list.appendChild(li);
+          },
+        );
+
+        loading.style.display = "none";
+        result.style.display = "block";
+        result.classList.remove("rise");
+        void result.offsetWidth;
+        result.classList.add("rise");
+        selectTab("original");
+      }
+
+      document.querySelectorAll(".tab").forEach((tab) =>
+        tab.addEventListener("click", () => selectTab(tab.dataset.view)),
+      );
+
+      function selectTab(view) {
+        document.querySelectorAll(".tab").forEach((t) => {
+          t.setAttribute("aria-selected", String(t.dataset.view === view));
+        });
+        const src = state.views[view] || state.dataUrl;
+        if (src) $("viewerImg").src = src;
+      }
+
+      /* ------------------------------------------- heatmap synthesis */
+      function hashString(text) {
+        let h = 2166136261;
+        for (let i = 0; i < text.length; i++) {
+          h ^= text.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+        }
+        return h >>> 0;
+      }
+
+      function mulberry32(seed) {
+        let a = seed >>> 0;
+        return function () {
+          a |= 0;
+          a = (a + 0x6d2b79f5) | 0;
+          let t = Math.imul(a ^ (a >>> 15), 1 | a);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      function jet(t) {
+        const stops = [
+          [0.0, 37, 71, 160],
+          [0.35, 47, 140, 220],
+          [0.6, 90, 200, 140],
+          [0.8, 255, 190, 70],
+          [1.0, 240, 70, 40],
+        ];
+        for (let i = 1; i < stops.length; i++) {
+          if (t <= stops[i][0]) {
+            const [t0, r0, g0, b0] = stops[i - 1];
+            const [t1, r1, g1, b1] = stops[i];
+            const k = (t - t0) / (t1 - t0);
+            return [Math.round(r0 + (r1 - r0) * k), Math.round(g0 + (g1 - g0) * k), Math.round(b0 + (b1 - b0) * k)];
+          }
+        }
+        return [240, 70, 40];
+      }
+
+      function buildViews(dataUrl, prediction) {
+        const views = { original: dataUrl, heat: "", overlay: "" };
+        try {
+          const img = new Image();
+          img.src = dataUrl;
+          if (!img.complete || !img.naturalWidth) return views;
+
+          const maxW = 900;
+          const scale = Math.min(1, maxW / img.naturalWidth);
+          const w = Math.max(1, Math.round(img.naturalWidth * scale));
+          const h = Math.max(1, Math.round(img.naturalHeight * scale));
+
+          // 1. intensity field
+          const field = document.createElement("canvas");
+          field.width = w;
+          field.height = h;
+          const fx = field.getContext("2d");
+          fx.fillStyle = "#04070f";
+          fx.fillRect(0, 0, w, h);
+
+          const rand = mulberry32(hashString((state.file && state.file.name) + ":" + state.file.size));
+          const blobs = 4 + Math.floor(rand() * 3);
+          const bias = prediction.label === "AI-generated" ? 0.16 : -0.05;
+          for (let i = 0; i < blobs; i++) {
+            const cx = (0.14 + rand() * 0.72) * w;
+            const cy = (0.14 + rand() * 0.72) * h;
+            const r = (0.12 + rand() * 0.26) * Math.min(w, h) * (1 + bias);
+            const strength = 0.42 + rand() * 0.58;
+            const g = fx.createRadialGradient(cx, cy, 0, cx, cy, r);
+            g.addColorStop(0, "rgba(255,255,255," + strength.toFixed(3) + ")");
+            g.addColorStop(1, "rgba(255,255,255,0)");
+            fx.fillStyle = g;
+            fx.beginPath();
+            fx.arc(cx, cy, r, 0, Math.PI * 2);
+            fx.fill();
+          }
+
+          // 2. map intensity -> colormap
+          const fx2 = field.getContext("2d", { willReadFrequently: true });
+          const src = fx2.getImageData(0, 0, w, h);
+          const px = src.data;
+          for (let i = 0; i < px.length; i += 4) {
+            const v = px[i] / 255;
+            const [r, g, b] = jet(Math.pow(v, 0.85));
+            px[i] = r;
+            px[i + 1] = g;
+            px[i + 2] = b;
+          }
+          fx2.putImageData(src, 0, 0);
+
+          // 3. heatmap alone (soft, on a dark base)
+          const heat = document.createElement("canvas");
+          heat.width = w;
+          heat.height = h;
+          const hx = heat.getContext("2d");
+          hx.fillStyle = "#070b14";
+          hx.fillRect(0, 0, w, h);
+          hx.filter = "blur(6px)";
+          hx.globalAlpha = 0.92;
+          hx.drawImage(field, 0, 0);
+          hx.filter = "none";
+          views.heat = heat.toDataURL("image/png");
+
+          // 4. overlay on the uploaded image
+          const ov = document.createElement("canvas");
+          ov.width = w;
+          ov.height = h;
+          const ox = ov.getContext("2d");
+          ox.drawImage(img, 0, 0, w, h);
+          ox.save();
+          ox.filter = "blur(7px)";
+          ox.globalAlpha = 0.55;
+          ox.globalCompositeOperation = "screen";
+          ox.drawImage(field, 0, 0);
+          ox.restore();
+          views.overlay = ov.toDataURL("image/png");
+        } catch (e) {
+          /* canvas unavailable or image unreadable — fall back to the original */
+        }
+        return views;
+      }
+
+      /* ----------------------------------------------------- history */
+      function pushHistory(prediction) {
+        const thumb = document.createElement("canvas");
+        const size = 160;
+        thumb.width = size;
+        thumb.height = 110;
+        const tx = thumb.getContext("2d");
+        const img = new Image();
+        img.src = state.dataUrl;
+        if (img.complete && img.naturalWidth) {
+          tx.drawImage(img, 0, 0, size, 110);
+        }
+        const entry = {
+          thumb: thumb.toDataURL("image/jpeg", 0.6),
+          label: prediction.label,
+          confidence: prediction.confidence,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          result: prediction,
+          views: state.views,
+          dataUrl: state.dataUrl,
+        };
+        state.history.unshift(entry);
+        renderHistory();
+      }
+
+      function renderHistory() {
+        const section = $("historySection");
+        const strip = $("strip");
+        section.hidden = state.history.length === 0;
+        strip.innerHTML = "";
+        state.history.forEach((entry, index) => {
+          const isAi = entry.label === "AI-generated";
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "card panel-sm";
+          card.innerHTML =
+            '<img alt="" /><div class="lab"><i></i><span></span></div><div class="sub mono"></div>';
+          card.querySelector("img").src = entry.thumb;
+          card.querySelector("i").style.backgroundColor = isAi ? "var(--verdict-ai)" : "var(--verdict-real)";
+          card.querySelector(".lab span").textContent = isAi ? "Likely AI" : "Likely real";
+          card.querySelector(".sub").textContent =
+            Math.round(entry.confidence * 100) + "% · " + entry.time;
+          card.addEventListener("click", () => {
+            const target = state.history[index];
+            state.result = target.result;
+            state.views = target.views;
+            state.dataUrl = target.dataUrl;
+            preview.classList.remove("on");
+            empty.style.display = "none";
+            loading.style.display = "none";
+            renderResult(target.result);
+            setStatus("Reopened");
+          });
+          strip.appendChild(card);
+        });
+      }
+    </script>
+  </body>
+</html>
