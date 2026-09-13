@@ -143,6 +143,15 @@
   }
 }
 
+@keyframes scan-vertical {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
 @utility rise-in {
   animation: rise-in 500ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
@@ -153,6 +162,10 @@
 
 @utility sweep-bar {
   animation: sweep 2.2s linear infinite;
+}
+
+@utility scan-vertical {
+  animation: scan-vertical 2.5s ease-in-out infinite;
 }
 
 /* Frosted panel — the primary surface of the interface. */
