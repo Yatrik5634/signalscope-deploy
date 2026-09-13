@@ -112,9 +112,16 @@ async def predict_image(file: UploadFile = File(alias="image"), caption: str = F
         
         # 3. Simulated Generator Attribution (Module B)
         # In a real scenario, this would be a separate classification head
-        family = "Stable Diffusion Class" if label == "AI-generated" else "N/A"
-        family_confidence = random.uniform(0.7, 0.95) if label == "AI-generated" else 0.0
-        
+        if label == "AI-generated":
+            family = "Stable Diffusion Class"
+            family_confidence = random.uniform(0.7, 0.95)
+        elif label == "Real":
+            family = "Human Captured (Real Image)"
+            family_confidence = random.uniform(0.85, 0.99)
+        else:
+            family = "Inconclusive Origin"
+            family_confidence = random.uniform(0.4, 0.6)
+            
         # 4. EXIF & Provenance (Module D)
         try:
             exif_data = img.getexif()
@@ -122,9 +129,14 @@ async def predict_image(file: UploadFile = File(alias="image"), caption: str = F
         except:
             has_exif = False
             
-        exif_summary = {"Camera": "Unknown", "Software": "Unknown"}
         if has_exif and label == "Real":
             exif_summary = {"Camera": "Standard Mobile Device", "Software": "Native OS"}
+        elif label == "Real":
+            exif_summary = {"Status": "Metadata Stripped", "Assessment": "Typical for social media or web distribution."}
+        elif label == "AI-generated":
+            exif_summary = {"Status": "Missing", "Assessment": "Synthetically generated images typically lack camera EXIF data."}
+        else:
+            exif_summary = {"Status": "Unknown", "Assessment": "Unable to verify provenance data."}
             
         # 5. Robustness Simulation (Module C)
         # We simulate a stability score based on how strong the confidence is
